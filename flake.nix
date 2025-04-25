@@ -88,7 +88,7 @@
       # Package a virtual environment as our main application.
       #
       # Enable no optional dependencies for production build.
-      packages.x86_64-linux.default = pythonSet.mkVirtualEnv "hello-world-env" workspace.deps.default;
+      packages.x86_64-linux.default = pythonSet.mkVirtualEnv ".uvenv" workspace.deps.default;
 
       # Make hello runnable with `nix run`
       apps.x86_64-linux = {
