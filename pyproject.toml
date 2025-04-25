@@ -1,0 +1,10 @@
+[project]
+name = "weems"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "nltk>=3.9.1",
+    "torch>=2.6.0",
+]
