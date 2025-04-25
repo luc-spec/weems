@@ -9,7 +9,7 @@ FIXED_LISTS_DIR='./lists/*.txt'
 def generate_random_url():
     if random.randint(1,10) < 2:
         return get_url_from_blocklist()
-    else
+    else:
         return get_dummy_url()
 
 def get_url_from_blocklist(file_pattern, sample_size=1):

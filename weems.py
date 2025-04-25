@@ -7,9 +7,7 @@ Weems
 '''
 
 # --- Full imports ---
-import dbus
 import time
-import numpy as np
 import psutil
 import threading
 import re
@@ -21,19 +19,16 @@ from dataclasses import dataclass
 from queue import Queue
 from concurrent.futures import ThreadPoolExecutor
 from collections import defaultdict
-from gi.repository import GLib
-from dbus.mainloop.glib import DBusGMainLoop
+
+# --- Local Imports ---
+#from utils import DbusOpensnitch
+from utils import FakeDbus, NetworkUtils, Sim
 
 # URL pattern database (simplified example)
 malicious_patterns = [r'malware', r'phish', r'exploit']
 suspicious_patterns = [r'tracker', r'ads\.', r'analytics']
 
 # Global objects
-request_queue = Queue()
-result_queue = Queue()
-belief_tracker = URLBeliefTracker()
-pomdp_solver = SimplePOMDPSolver()
-
 
 @dataclass
 class State:
@@ -196,217 +191,153 @@ class URLBeliefTracker:
 
         return belief
 
+class Weems:
+    def __init__(self):
+        self.request_queue = Queue()
+        self.result_queue = Queue()
+        self.belief_tracker = URLBeliefTracker()
+        self.pomdp_solver = SimplePOMDPSolver()
 
-def get_dummy_network_load():
-    """Get current network load percentage (0-100)"""
-    # In a real implementation, measure actual network throughput
-    # For simplicity, we'll return a random value here
-    return np.random.randint(10, 80)
 
-def get_current_network_load(interface=None, interval=1.0, max_bandwidth=None):
-    """
-    Get current network load percentage (0-100)
+    def extract_url_from_connection(self, connection_data):
+        """Extract URL from OpenSnitch connection data"""
+
+        """
+        ConnectionEvent = namedtuple('ConnectionEvent', [
+            'process_path', 'process_id', 'destination_ip', 'destination_port', 
+            'protocol', 'user_id', 'process_args'
+        ])
+        """
+
+        try:
+            # In a real implementation, parse OpenSnitch data properly
+            # This is a placeholder example
+            dst_host = connection_data[2]
+            dst_port = connection_data[3]
+            protocol = connection_data[4]
     
-    Args:
-        interface: Specific network interface to measure (None = all interfaces)
-        interval: Time in seconds to measure traffic (default=1.0)
-        max_bandwidth: Maximum bandwidth in bytes/sec for calculating percentage
-                      (None = auto-calculate based on recent peak)
+            if protocol.lower() in ["tcp", "udp"] and dst_host:
+                scheme = "https" if dst_port == 443 else "http"
+                return f"{scheme}://{dst_host}:{dst_port}"
+            return None
+        except Exception as e:
+            print(f"Error extracting URL: {e}")
+            return None
     
-    Returns:
-        Float representing network utilization percentage (0-100)
-    """
-    # Get initial bytes count
-    initial_counters = psutil.net_io_counters(pernic=True)
     
-    # If no specific interface given, sum across all interfaces
-    if interface is None:
-        initial_bytes = sum(counter.bytes_sent + counter.bytes_recv 
-                          for counter in initial_counters.values())
-    else:
-        if interface not in initial_counters:
-            raise ValueError(f"Interface {interface} not found. Available interfaces: {list(initial_counters.keys())}")
-        initial_bytes = initial_counters[interface].bytes_sent \
-                       + initial_counters[interface].bytes_recv
+    def process_request(self, url_request):
+        """Process a URL request and make decision"""
+        url = url_request.get('url')
+        domain = urllib.parse.urlparse(url).netloc
     
-    # Wait for specified interval
-    time.sleep(interval)
+        # Extract features for POMDP
+        # TODO: replace with text classifier
+        is_suspicious = any(re.search(pattern, url)
+                            for pattern in suspicious_patterns)
+        is_malicious = any(re.search(pattern, url)
+                           for pattern in malicious_patterns)
     
-    # Get bytes count after interval
-    final_counters = psutil.net_io_counters(pernic=True)
+        if is_malicious:
+            safety = "Malicious"
+        elif is_suspicious:
+            safety = "Suspicious"
+        else:
+            safety = "Safe"
     
-    # Calculate bytes during interval
-    if interface is None:
-        final_bytes = sum(counter.bytes_sent + counter.bytes_recv 
-                        for counter in final_counters.values())
-    else:
-        final_bytes = final_counters[interface].bytes_sent + final_counters[interface].bytes_recv
+        # Get current network load
+        network_load = get_current_network_load()
     
-    bytes_per_second = (final_bytes - initial_bytes) / interval
+        # Create POMDP state
+        current_state = NetworkState(safety, network_load)
     
-    # If max_bandwidth not provided, use a reasonable default or based on recent measurements
-    if max_bandwidth is None:
-        # Default to 1 Gbps (125 MB/s) or use a dynamic approach
-        max_bandwidth = 125 * 1024 * 1024  # 1 Gbps in bytes/sec
+        # Update belief and make decision using POMDP
+        belief = belief_tracker.update_belief(domain, url)
+        action = pomdp_solver.solve(belief, current_state)
     
-    # Calculate percentage (cap at 100%)
-    percentage = min(100.0, (bytes_per_second / max_bandwidth) * 100)
-    
-    return percentage
-
-def extract_url_from_connection(connection_data):
-    """Extract URL from OpenSnitch connection data"""
-    try:
-        # In a real implementation, parse OpenSnitch data properly
-        # This is a placeholder example
-        protocol = connection_data.get("protocol", "")
-        dst_host = connection_data.get("dst_host", "")
-        dst_port = connection_data.get("dst_port", 80)
-
-        if protocol.lower() in ["tcp", "udp"] and dst_host:
-            scheme = "https" if dst_port == 443 else "http"
-            return f"{scheme}://{dst_host}:{dst_port}"
-        return None
-    except Exception as e:
-        print(f"Error extracting URL: {e}")
-        return None
-
-
-def process_request(url_request):
-    """Process a URL request and make decision"""
-    url = url_request.get('url')
-    domain = urllib.parse.urlparse(url).netloc
-
-    # Extract features for POMDP
-    is_suspicious = any(re.search(pattern, url)
-                        for pattern in suspicious_patterns)
-    is_malicious = any(re.search(pattern, url)
-                       for pattern in malicious_patterns)
-
-    if is_malicious:
-        safety = "Malicious"
-    elif is_suspicious:
-        safety = "Suspicious"
-    else:
-        safety = "Safe"
-
-    # Get current network load
-    network_load = get_current_network_load()
-
-    # Create POMDP state
-    current_state = NetworkState(safety, network_load)
-
-    # Update belief and make decision using POMDP
-    belief = belief_tracker.update_belief(domain, url)
-    action = pomdp_solver.solve(belief, current_state)
-
-    print(
-        f"URL: {url} | Safety: {safety} | Decision: {'ALLOW' if action.allow else 'BLOCK'}")
-
-    # Return decision to OpenSnitch
-    return {
-        "allow": action.allow,
-        "url": url,
-        "domain": domain,
-        "reason": f"POMDP decision (safety={safety}, load={network_load}%)"
-    }
-
-
-def worker(worker_id):
-    """Worker thread for processing URL requests"""
-    print(f"Worker {worker_id} started")
-    while True:
-        url_request = request_queue.get()
-        if url_request is None:  # Poison pill for shutdown
-            break
-
-        # Process the URL request
-        decision = process_request(url_request)
-        result_queue.put(decision)
-        request_queue.task_done()
-
-
-def result_handler():
-    """Thread for handling processing results"""
-    while True:
-        result = result_queue.get()
-        if result is None:  # Poison pill
-            break
-
-        # In a real implementation, send decision back to OpenSnitch
-        # For now, just log the result
         print(
-            f"Decision for {result['url']}: {'ALLOW' if result['allow'] else 'BLOCK'} - {result['reason']}")
-        result_queue.task_done()
+            f"URL: {url} | Safety: {safety} | Decision: {'ALLOW' if action.allow else 'BLOCK'}")
+    
+        # Return decision to OpenSnitch
+        return {
+            "allow": action.allow,
+            "url": url,
+            "domain": domain,
+            "reason": f"POMDP decision (safety={safety}, load={network_load}%)"
+        }
+    
+    
+    def worker(self, worker_id):
+        """Worker thread for processing URL requests"""
+        print(f"Worker {worker_id} started")
+        while True:
+            url_request = self.request_queue.get()
+            if url_request is None:  # Poison pill for shutdown
+                break
+    
+            # Process the URL request
+            decision = self.process_request(url_request)
+            self.result_queue.put(decision)
+            self.request_queue.task_done()
+    
+    
+    def result_handler(self):
+        """Thread for handling processing results"""
+        while True:
+            result = self.result_queue.get()
+            if result is None:  # Poison pill
+                break
+    
+            # In a real implementation, send decision back to OpenSnitch
+            # For now, just log the result
+            print(
+                f"Decision for {result['url']}: {'ALLOW' if result['allow'] else 'BLOCK'} - {result['reason']}")
+            self.result_queue.task_done()
+    
+    
+    def handle_connection(self, connection_data):
+        """Handle new connection event from OpenSnitch"""
+        url = self.extract_url_from_connection(connection_data)
+        if url:
+            print(f"New connection: {url}")
+            self.request_queue.put({"url": url, "connection_data": connection_data})
 
 
-def handle_connection(connection_data):
-    """Handle new connection event from OpenSnitch"""
-    url = extract_url_from_connection(connection_data)
-    if url:
-        print(f"New connection: {url}")
-        request_queue.put({"url": url, "connection_data": connection_data})
+def run_dbus():
+    DBusGMainLoop(set_as_default=True)
+    DbusOpensnitch.setup_opensnitch_listener()
 
-
-def setup_opensnitch_listener():
-    """Set up OpenSnitch D-Bus listener"""
-    try:
-        # Connect to OpenSnitch D-Bus interface
-        bus = dbus.SystemBus()
-
-        opensnitch_object = bus.get_object(
-            "io.github.evilsocket.opensnitch",
-            "/io/github/evilsocket/opensnitch/rule"
-        )
-
-        opensnitch_interface = dbus.Interface(
-            opensnitch_object,
-            "io.github.evilsocket.opensnitch.Rule"
-        )
-
-        # Register for connection events
-        opensnitch_interface.connect_to_signal(
-            "NewConnection", handle_connection)
-
-        print("OpenSnitch listener configured successfully")
-
-        # Start the main loop
-        loop = GLib.MainLoop()
-        loop.run()
-
-    except Exception as e:
-        print(f"Error setting up OpenSnitch listener: {e}")
-
+def run_fake_dbus(handler: callable = FakeDbus.handle_connection):
+    FakeDbus.setup_opensnitch_listener(handler)
 
 def main():
     """Main function to start the application"""
     print("Starting Adaptive Network Filter")
+    w = Weems()
 
-    # Start worker threads
-    NUM_WORKERS = 8  # Adjust based on your system
+    NUM_WORKERS = 8  # tuning parameter; make cli param?
     workers = []
+
     with ThreadPoolExecutor(max_workers=NUM_WORKERS) as executor:
         # Submit worker tasks
         for i in range(NUM_WORKERS):
-            workers.append(executor.submit(worker, i))
+            workers.append(executor.submit(w.worker, i))
 
         # Start result handler
-        result_thread = threading.Thread(target=result_handler)
+        result_thread = threading.Thread(target=w.result_handler)
         result_thread.daemon = True
         result_thread.start()
 
         # Set up OpenSnitch listener in the main thread
         try:
-            # Initialize D-Bus connection
-            DBusGMainLoop(set_as_default=True)
-            setup_opensnitch_listener()
+            #run_dbus()
+            run_fake_dbus(w.handle_connection)
         except KeyboardInterrupt:
             print("Shutting down...")
         finally:
             # Send poison pills to workers and result handler
             for _ in range(NUM_WORKERS):
-                request_queue.put(None)
-            result_queue.put(None)
+                w.request_queue.put(None)
+            w.result_queue.put(None)
 
 
 if __name__ == "__main__":

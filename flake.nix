@@ -81,6 +81,9 @@
             pkgs.pkg-config
             python.pkgs.meson-python  # This provides mesonpy
           ];
+          #env = {
+          #  LD_LIBRARY_PATH="/usr/lib64:$LD_LIBRARY_PATH";
+          #};
         };
       }
     );
