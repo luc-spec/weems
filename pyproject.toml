@@ -12,7 +12,10 @@ description = "Weems is a smart, adaptive, network filter that maximizes network
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "dbus-python>=1.4.0",
+    "meson-python>=0.17.1",
     "nltk>=3.9.1",
+    "systemd>=0.17.1",
 ]
 
 [dependency-groups]

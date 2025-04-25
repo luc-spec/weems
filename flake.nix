@@ -73,6 +73,12 @@
           packages = [
             pkgs.uv
             venv
+            
+            # Add build dependencies
+            pkgs.meson
+            pkgs.ninja
+            pkgs.pkg-config
+            python.pkgs.meson-python  # This provides mesonpy
           ];
         };
       }
