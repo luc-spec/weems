@@ -228,6 +228,7 @@ dependencies = [
     { name = "nltk" },
     { name = "numpy" },
     { name = "psutil" },
+    { name = "pytest" },
 ]
 
 [package.dev-dependencies]
@@ -242,6 +243,7 @@ requires-dist = [
     { name = "nltk", specifier = ">=3.9.1" },
     { name = "numpy", specifier = ">=2.1.2" },
     { name = "psutil", specifier = ">=7.0.0" },
+    { name = "pytest", specifier = ">=8.3.5" },
 ]
 
 [package.metadata.requires-dev]
