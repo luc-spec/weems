@@ -1,3 +1,5 @@
+.envrc
+
 .venv/
 .weems/
 proto/
