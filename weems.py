@@ -1,344 +1,177 @@
-'''
+#!/usr/bin/env python3
+"""
+OpenSnitch Smart Policy with Reinforcement Learning - Main Entry Point
+This script initializes and runs the OpenSnitch RL agent.
+"""
 
-Weems
-
-  An adaptive network filter service.
-
-'''
-
-# --- Full imports ---
+import os
+import sys
 import time
-import psutil
-import threading
-import re
-import urllib.parse
+import signal
+import logging
+import argparse
+from typing import Optional
+
+# Import the RL Agent module
+# Assuming the code is in a file called opensnitch_rl.py
+from opensnitch_rl import OpenSnitchRLAgent, OpenSnitchConnection
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.FileHandler("opensnitch_rl_main.log"), logging.StreamHandler()],
+)
+logger = logging.getLogger("opensnitch_rl_main")
 
 
-# --- Partial imports ---
-from dataclasses import dataclass
-from queue import Queue
-from concurrent.futures import ThreadPoolExecutor
-from collections import defaultdict
+class OpenSnitchSimulator:
+    """
+    Simulates OpenSnitch connections for testing purposes.
+    In a real implementation, this would integrate with OpenSnitch's API.
+    """
 
-# --- Local Imports ---
-#from utils import DbusOpensnitch
-from utils import FakeDbus, NetworkUtils, Sim
-
-# URL pattern database (simplified example)
-malicious_patterns = [r'malware', r'phish', r'exploit']
-suspicious_patterns = [r'tracker', r'ads\.', r'analytics']
-
-# Global objects
-
-@dataclass
-class State:
-    '''Data structure for keeping track of allow/block states'''
-    allowed: tuple[str]
-    blocked: tuple[str]
-
-
-@dataclass
-class StateSpace:
-    '''
-    StateSpace: FIFO list of allow and block list tuples 
-    '''
-    _history: list[State]
-
-    def __init__(self, history_length: int = 10000):
-        self._max_len = history_length
-
-    def current(self):
-        '''
-        Get the most recent allow/block lists
-        '''
-        return self._history[0]
-
-    def history(self):
-        '''
-        Get the full history of state space
-        '''
-        return self._history
-
-    def add(self, s: State):
-        '''
-        Add a State to the 0 index of our history
-        '''
-        self._history.insert(State)
-
-    def remove(self):
-        '''
-        With no arguments, just remove our last entry
-        '''
-        self._history.pop(0)
-
-    def remove(self, url: str):
-        '''
-        If we have a url argument, then make a new history entry
-        with that url removed
-        '''
-        for entry in self._history:
-            if url in entry.blocked:
-                self._history.remove(entry)
-
-# ---- POMDP Classes ----
-
-
-class NetworkState:
-    def __init__(self, url_safety, network_load):
-        self.url_safety = url_safety  # Safe, Suspicious, Malicious
-        self.network_load = network_load  # Current network load percentage
-
-
-class NetworkAction:
-    def __init__(self, allow):
-        self.allow = allow  # True = allow, False = block
-
-
-class NetworkObservation:
-    def __init__(self, observed_behavior):
-        self.observed_behavior = observed_behavior  # Normal, Suspicious
-
-# Simplified POMDP solver (in practice, use a library like pomdp_py)
-
-
-class SimplePOMDPSolver:
-    def __init__(self, network_usage_weight=0.7, safety_weight=0.3):
-        self.network_usage_weight = network_usage_weight
-        self.safety_weight = safety_weight
-
-    def calculate_reward(self, state, allow):
-        reward = 0
-
-        # Reward for network utilization
-        if allow:
-            reward += self.network_usage_weight * \
-                (1.0 - state.network_load/100.0)
-
-            # Penalty for allowing unsafe URLs
-            if state.url_safety == "Suspicious":
-                reward -= self.safety_weight * 0.5
-            elif state.url_safety == "Malicious":
-                reward -= self.safety_weight * 1.0
-        else:
-            # Small penalty for blocking to encourage network usage
-            reward -= self.network_usage_weight * 0.1
-
-            # Reward for blocking unsafe URLs
-            if state.url_safety == "Suspicious":
-                reward += self.safety_weight * 0.3
-            elif state.url_safety == "Malicious":
-                reward += self.safety_weight * 0.8
-
-        return reward
-
-    def solve(self, belief, state):
-        # Calculate expected rewards for each action
-        allow_reward = self.calculate_reward(state, True)
-        block_reward = self.calculate_reward(state, False)
-
-        # Factor in domain reputation from belief
-        domain_factor = min(1.0, belief.get("reputation", 0.5))
-        allow_reward *= domain_factor
-
-        # Choose action with highest reward
-        return NetworkAction(allow_reward > block_reward)
-
-# ---- URL Processing ----
-
-class URLBeliefTracker:
     def __init__(self):
-        self.domain_beliefs = defaultdict(lambda: {
-            "reputation": 0.5,  # 0.0 bad - 1.0 good
-            "visit_count": 0,
-            "block_count": 0,
-            "suspicious_activity": 0,
-            "last_updated": time.time()
-        })
+        self.common_connections = [
+            # Web browser connecting to websites
+            OpenSnitchConnection(
+                process_path="/usr/bin/firefox",
+                pid=1000,
+                dst_ip="142.250.185.78",
+                dst_host="www.google.com",
+                dst_port=443,
+                protocol="tcp",
+                user_id=1000,
+            ),
+            # Email client
+            OpenSnitchConnection(
+                process_path="/usr/bin/thunderbird",
+                pid=1001,
+                dst_ip="104.47.56.33",
+                dst_host="outlook.office365.com",
+                dst_port=993,
+                protocol="tcp",
+                user_id=1000,
+            ),
+            # System update
+            OpenSnitchConnection(
+                process_path="/usr/bin/apt",
+                pid=1002,
+                dst_ip="91.189.91.38",
+                dst_host="archive.ubuntu.com",
+                dst_port=80,
+                protocol="tcp",
+                user_id=0,
+            ),
+            # Suspicious connection (example)
+            OpenSnitchConnection(
+                process_path="/tmp/suspicious_app",
+                pid=1003,
+                dst_ip="203.0.113.100",  # Example IP in documentation range
+                dst_host="malware-server.example",
+                dst_port=4444,  # Common malware port
+                protocol="tcp",
+                user_id=1000,
+            ),
+        ]
 
-    def update_belief(self, domain, url):
-        """Update belief based on domain history and URL patterns"""
-        belief = self.domain_beliefs[domain]
+    def get_random_connection(self):
+        """Return a random connection from the list of common connections"""
+        import random
 
-        # Decay older information (time-based forgetting)
-        time_diff = time.time() - belief["last_updated"]
-        if time_diff > 3600:  # 1 hour
-            # Max 1 day for full decay
-            decay_factor = min(1.0, time_diff / 86400)
-            belief["reputation"] = 0.5 + \
-                (belief["reputation"] - 0.5) * (1 - decay_factor)
-            belief["last_updated"] = time.time()
-
-        # Check for suspicious patterns
-        is_suspicious = any(re.search(pattern, url)
-                            for pattern in suspicious_patterns)
-        is_malicious = any(re.search(pattern, url)
-                           for pattern in malicious_patterns)
-
-        # Update belief based on URL checks
-        if is_malicious:
-            belief["reputation"] *= 0.5  # Strong negative impact
-            belief["suspicious_activity"] += 2
-        elif is_suspicious:
-            belief["reputation"] *= 0.8  # Moderate negative impact
-            belief["suspicious_activity"] += 1
-        else:
-            # Good URL - slightly improve reputation
-            belief["reputation"] = min(1.0, belief["reputation"] * 1.05)
-
-        # Normalize reputation
-        belief["reputation"] = max(0.01, min(0.99, belief["reputation"]))
-        belief["visit_count"] += 1
-
-        return belief
-
-class Weems:
-    def __init__(self):
-        self.request_queue = Queue()
-        self.result_queue = Queue()
-        self.belief_tracker = URLBeliefTracker()
-        self.pomdp_solver = SimplePOMDPSolver()
+        return random.choice(self.common_connections)
 
 
-    def extract_url_from_connection(self, connection_data):
-        """Extract URL from OpenSnitch connection data"""
+def simulate_user_feedback():
+    """Simulate a user's feedback on a decision"""
+    import random
 
-        """
-        ConnectionEvent = namedtuple('ConnectionEvent', [
-            'process_path', 'process_id', 'destination_ip', 'destination_port', 
-            'protocol', 'user_id', 'process_args'
-        ])
-        """
+    return random.choice([True, False])
+
+
+def main(model_path: Optional[str] = None, simulation_mode: bool = False):
+    """
+    Main entry point for the OpenSnitch RL Agent
+
+    Args:
+        model_path: Path to a pre-trained model file (optional)
+        simulation_mode: Whether to run in simulation mode for testing
+    """
+    logger.info("Starting OpenSnitch RL Agent")
+
+    # Initialize the agent
+    agent = OpenSnitchRLAgent(model_path=model_path)
+
+    if simulation_mode:
+        logger.info("Running in simulation mode")
+        simulator = OpenSnitchSimulator()
 
         try:
-            # In a real implementation, parse OpenSnitch data properly
-            # This is a placeholder example
-            dst_host = connection_data[2]
-            dst_port = connection_data[3]
-            protocol = connection_data[4]
-    
-            if protocol.lower() in ["tcp", "udp"] and dst_host:
-                scheme = "https" if dst_port == 443 else "http"
-                return f"{scheme}://{dst_host}:{dst_port}"
-            return None
-        except Exception as e:
-            print(f"Error extracting URL: {e}")
-            return None
-    
-    
-    def process_request(self, url_request):
-        """Process a URL request and make decision"""
-        url = url_request.get('url')
-        domain = urllib.parse.urlparse(url).netloc
-    
-        # Extract features for POMDP
-        # TODO: replace with text classifier
-        is_suspicious = any(re.search(pattern, url)
-                            for pattern in suspicious_patterns)
-        is_malicious = any(re.search(pattern, url)
-                           for pattern in malicious_patterns)
-    
-        if is_malicious:
-            safety = "Malicious"
-        elif is_suspicious:
-            safety = "Suspicious"
-        else:
-            safety = "Safe"
-    
-        # Get current network load
-        network_load = get_current_network_load()
-    
-        # Create POMDP state
-        current_state = NetworkState(safety, network_load)
-    
-        # Update belief and make decision using POMDP
-        belief = belief_tracker.update_belief(domain, url)
-        action = pomdp_solver.solve(belief, current_state)
-    
-        print(
-            f"URL: {url} | Safety: {safety} | Decision: {'ALLOW' if action.allow else 'BLOCK'}")
-    
-        # Return decision to OpenSnitch
-        return {
-            "allow": action.allow,
-            "url": url,
-            "domain": domain,
-            "reason": f"POMDP decision (safety={safety}, load={network_load}%)"
-        }
-    
-    
-    def worker(self, worker_id):
-        """Worker thread for processing URL requests"""
-        print(f"Worker {worker_id} started")
-        while True:
-            url_request = self.request_queue.get()
-            if url_request is None:  # Poison pill for shutdown
-                break
-    
-            # Process the URL request
-            decision = self.process_request(url_request)
-            self.result_queue.put(decision)
-            self.request_queue.task_done()
-    
-    
-    def result_handler(self):
-        """Thread for handling processing results"""
-        while True:
-            result = self.result_queue.get()
-            if result is None:  # Poison pill
-                break
-    
-            # In a real implementation, send decision back to OpenSnitch
-            # For now, just log the result
-            print(
-                f"Decision for {result['url']}: {'ALLOW' if result['allow'] else 'BLOCK'} - {result['reason']}")
-            self.result_queue.task_done()
-    
-    
-    def handle_connection(self, connection_data):
-        """Handle new connection event from OpenSnitch"""
-        url = self.extract_url_from_connection(connection_data)
-        if url:
-            print(f"New connection: {url}")
-            self.request_queue.put({"url": url, "connection_data": connection_data})
+            # Run simulation loop
+            for i in range(1000):  # Simulate 1000 connections
+                connection = simulator.get_random_connection()
+                logger.info(
+                    f"Simulation {i+1}: {connection.process_path} -> {connection.dst_host}:{connection.dst_port}"
+                )
 
+                # Get decision from agent
+                action, rule = agent.decide(connection)
 
-def run_dbus():
-    DBusGMainLoop(set_as_default=True)
-    DbusOpensnitch.setup_opensnitch_listener()
+                # Simulate user feedback (for learning)
+                feedback = simulate_user_feedback()
 
-def run_fake_dbus(handler: callable = FakeDbus.handle_connection):
-    FakeDbus.setup_opensnitch_listener(handler)
+                # Provide feedback to agent
+                reward = agent.reward_function.calculate_reward(
+                    agent.feature_extractor.extract(connection), action, None, feedback
+                )
 
-def main():
-    """Main function to start the application"""
-    print("Starting Adaptive Network Filter")
-    w = Weems()
+                # Add to memory for training
+                state = agent.feature_extractor.extract(connection)
+                agent.memory.add(state, action, reward, state, False)
 
-    NUM_WORKERS = 8  # tuning parameter; make cli param?
-    workers = []
+                # Update exploration strategy
+                state_hash = hash(tuple(state)) % 1000000
+                state_hash = f"{connection.process_path}_{state_hash}"
+                agent.exploration.update(state_hash, action, reward)
 
-    with ThreadPoolExecutor(max_workers=NUM_WORKERS) as executor:
-        # Submit worker tasks
-        for i in range(NUM_WORKERS):
-            workers.append(executor.submit(w.worker, i))
+                # Train periodically
+                if i % 10 == 0:
+                    loss = agent.train()
+                    if loss is not None:
+                        logger.info(f"Training loss: {loss}")
 
-        # Start result handler
-        result_thread = threading.Thread(target=w.result_handler)
-        result_thread.daemon = True
-        result_thread.start()
+                # Sleep to simulate time passing
+                time.sleep(0.1)
 
-        # Set up OpenSnitch listener in the main thread
-        try:
-            #run_dbus()
-            run_fake_dbus(w.handle_connection)
         except KeyboardInterrupt:
-            print("Shutting down...")
-        finally:
-            # Send poison pills to workers and result handler
-            for _ in range(NUM_WORKERS):
-                w.request_queue.put(None)
-            w.result_queue.put(None)
+            logger.info("Simulation interrupted")
+
+        # Save the model after simulation
+        save_path = "opensnitch_rl_model.pth"
+        agent.save_model(save_path)
+        logger.info(f"Model saved to {save_path}")
+
+    else:
+        # In a real implementation, this would integrate with OpenSnitch's events
+        logger.info("Real mode not implemented - need OpenSnitch API integration")
+        logger.info("To test functionality, run with --simulation flag")
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="OpenSnitch RL Agent")
+    parser.add_argument("--model", type=str, help="Path to pre-trained model file")
+    parser.add_argument(
+        "--simulation", action="store_true", help="Run in simulation mode"
+    )
+
+    args = parser.parse_args()
+
+    # Register signal handler for clean exit
+    def signal_handler(sig, frame):
+        logger.info("Exiting OpenSnitch RL Agent")
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, signal_handler)
+
+    # Run main function
+    main(model_path=args.model, simulation_mode=args.simulation)

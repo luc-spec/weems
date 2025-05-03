@@ -4,11 +4,12 @@ from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.pipeline import make_pipeline
 
+
 # Step 1: Preprocessing the PiHole blocklist file
 def preprocess_pihole_blocklist(file_path):
     """Remove comments and '0.0.0.0' from each line in a blocklist."""
     processed_lines = []
-    with open(file_path, 'r') as f:
+    with open(file_path, "r") as f:
         for line in f:
             line = line.strip()
             if line.startswith("#") or not line:
@@ -18,6 +19,7 @@ def preprocess_pihole_blocklist(file_path):
                 domain = parts[1]
                 processed_lines.append(domain)
     return processed_lines
+
 
 # Step 2: Build a Naive Bayes text classifier from blocklist
 def create_classifier(blocklist_data):
@@ -39,10 +41,12 @@ def create_classifier(blocklist_data):
 
     return model
 
+
 # Step 3: Classify a single URI
 def classify_request(classifier, uri):
     prediction = classifier.predict([uri])[0]
     return "blocked" if prediction == 1 else "allowed"
+
 
 # Step 4: Process all files and classify requests
 def process_and_classify_requests(blocklist_folder, opensnitch_requests):
@@ -60,23 +64,44 @@ def process_and_classify_requests(blocklist_folder, opensnitch_requests):
     # Classify each Opensnitch request
     results = []
     for request in opensnitch_requests:
-        uri = request['uri']
+        uri = request["uri"]
         classification = classify_request(classifier, uri)
         results.append((request, classification))
 
     return results
 
+
 # Example Opensnitch request simulation
 if __name__ == "__main__":
-    # blocklist_folder = 'weems\\lists' 
-    blocklist_folder = 'lists'
-    
+    # blocklist_folder = 'weems\\lists'
+    blocklist_folder = "lists"
+
     # Sample requests
     opensnitch_requests = [
-        {"uri": "0-0-0.6te.net", "executable": "chrome", "protocol": "TCP", "to_uri": "0-0-0.6te.net"},
-        {"uri": "openai.com", "executable": "python", "protocol": "TCP", "to_uri": "openai.com"},
-        {"uri": "badexample.mal", "executable": "wget", "protocol": "TCP", "to_uri": "badexample.mal"},
-        {"uri": "github.com", "executable": "code", "protocol": "TCP", "to_uri": "github.com"},
+        {
+            "uri": "0-0-0.6te.net",
+            "executable": "chrome",
+            "protocol": "TCP",
+            "to_uri": "0-0-0.6te.net",
+        },
+        {
+            "uri": "openai.com",
+            "executable": "python",
+            "protocol": "TCP",
+            "to_uri": "openai.com",
+        },
+        {
+            "uri": "badexample.mal",
+            "executable": "wget",
+            "protocol": "TCP",
+            "to_uri": "badexample.mal",
+        },
+        {
+            "uri": "github.com",
+            "executable": "code",
+            "protocol": "TCP",
+            "to_uri": "github.com",
+        },
     ]
 
     results = process_and_classify_requests(blocklist_folder, opensnitch_requests)

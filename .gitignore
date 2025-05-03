@@ -1,1 +1,7 @@
 .venv/
+logs/
+data/
+models/
+proto/
+
+**__pycache__**
