@@ -1,7 +1,5 @@
 .venv/
-logs/
-data/
-models/
+.weems/
 proto/
 
 **__pycache__**
