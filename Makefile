@@ -11,6 +11,11 @@ init:
 test:
 	@uv run pytest
 
+format: 
+	@black ./*.py
+	@black ./utils/*.py
+	@black ./tests/*.py
+
 # Clone OpenSnitch repository to get proto files
 clone-proto:
 	@echo "Cloning OpenSnitch repository to get proto files..."
