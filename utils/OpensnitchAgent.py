@@ -4,6 +4,9 @@ import sys
 import logging
 from concurrent import futures
 
+## Local Imports
+from . import pathconf
+
 # These imports will work after you've run `make generate-proto`
 from proto import opensnitch_pb2
 from proto import opensnitch_pb2_grpc
@@ -34,8 +37,8 @@ class OpenSnitchAgent:
         """Start receiving notifications about connection events."""
         try:
             # Create a notification request
-            notification_request = opensnitch_pb2.NotificationRequest(
-                id=self.agent_id, type=opensnitch_pb2.NOTIFICATION_TYPE_CONNECTION
+            notification_request = opensnitch_pb2.Notification(
+                id=self.agent_id, type=opensnitch_pb2.Action
             )
 
             logger.info(f"Starting notification stream with ID: {self.agent_id}")
@@ -157,3 +160,30 @@ class OpenSnitchAgent:
             )
         except grpc.RpcError as e:
             logger.error(f"Error sending decision: {e}")
+
+def main():
+    """Main entry point"""
+    print("OpenSnitchAgent -- Check Opensnitch Integration")
+    print("=" * 60)
+
+    # Parse command line arguments
+    import argparse
+
+    osa = OpenSnitchAgent()
+
+    try:
+        # Run simulation
+        print(f"Listening for Opensnitch gRPC information..")
+        osa.start_notifications()
+
+        while True:
+            time.sleep(1)
+
+    except KeyboardInterrupt:
+        print("\nShutting down...")
+
+    print("Done.")
+
+
+if __name__ == "__main__":
+    main()

@@ -70,7 +70,7 @@ class TestOpenSnitchAgent:
         assert notification_request_call.id == agent_with_mocks.agent_id
         assert (
             notification_request_call.type
-            == opensnitch_pb2.NOTIFICATION_TYPE_CONNECTION
+            == opensnitch_pb2.Action
         )
 
     def test_process_notification(self, agent_with_mocks):
@@ -85,7 +85,7 @@ class TestOpenSnitchAgent:
         mock_connection.user_id = "1000"
 
         mock_notification = Mock()
-        mock_notification.type = opensnitch_pb2.NOTIFICATION_TYPE_CONNECTION
+        mock_notification.type = opensnitch_pb2.Action
         mock_notification.connection = mock_connection
 
         # Create a spy on the send_decision method
@@ -110,7 +110,7 @@ class TestOpenSnitchAgent:
 
         # Create a mock notification with the connection
         mock_notification = MagicMock()
-        mock_notification.type = opensnitch_pb2.NOTIFICATION_TYPE_CONNECTION
+        mock_notification.type = opensnitch_pb2.Action
         mock_notification.connection = mock_connection
 
         # Make the stub's Notifications method return an iterable with our mock notification
@@ -225,7 +225,7 @@ class TestOpenSnitchAgent:
                         # Try to get notifications for 2 seconds
                         notification_request = opensnitch_pb2.NotificationRequest(
                             id=agent.agent_id,
-                            type=opensnitch_pb2.NOTIFICATION_TYPE_CONNECTION,
+                            type=opensnitch_pb2.Action,
                         )
 
                         # Use a timeout to avoid hanging

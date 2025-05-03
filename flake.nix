@@ -19,13 +19,15 @@
               black
               grpcio
               grpcio-tools
+              pip
               protobuf
+              setuptools
             ]))
             
             # Development tools
             gnumake
             git
-            
+
             # UV package manager
             python313Packages.uv
             
@@ -33,6 +35,10 @@
             protobuf
 
             stdenv.cc.cc.lib
+            openssl
+            glib
+            zlib
+            
             
           ];
           
@@ -42,7 +48,12 @@
               pkgs.zlib
               pkgs.glib
               pkgs.xorg.libX11
+              pkgs.openssl
             ]}:$LD_LIBRARY_PATH"
+
+            # Environment variables for grpc
+            export GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=1
+            export GRPC_PYTHON_BUILD_SYSTEM_ZLIB=1
             
             # For debugging
             echo "LD_LIBRARY_PATH is set to: $LD_LIBRARY_PATH"
