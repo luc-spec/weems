@@ -1,89 +1,71 @@
 {
-  description = "uv2nix devshell";
+  description = "OpenSnitch Agent Development Environment";
 
   inputs = {
-    #nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-24.11";
-    flake-utils = {
-      url = "github:numtide/flake-utils";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-    pyproject-nix = {
-      url = "github:pyproject-nix/pyproject.nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-    uv2nix = {
-      url = "github:pyproject-nix/uv2nix";
-      inputs.pyproject-nix.follows = "pyproject-nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-    pyproject-build-systems = {
-      url = "github:pyproject-nix/build-system-pkgs";
-      inputs.pyproject-nix.follows = "pyproject-nix";
-      inputs.uv2nix.follows = "uv2nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-    devshell = {
-      url = "github:numtide/devshell";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    flake-utils.url = "github:numtide/flake-utils";
   };
-
-
-  outputs =
-    inputs@{
-      nixpkgs,
-      flake-utils,
-      ...
-    }:
-    flake-utils.lib.eachDefaultSystem (
-      system:
+  
+  outputs = { self, nixpkgs, flake-utils }:
+    flake-utils.lib.eachDefaultSystem (system:
       let
-        workspaceRoot = ./.;
-        venvName = "venv";
-        python = pkgs.python312;
-
-	pkgs = import nixpkgs {
-	  inherit system;
-	  config.allowUnfree = true;
-        };
-
-        workspace = inputs.uv2nix.lib.workspace.loadWorkspace { 
-          workspaceRoot = workspaceRoot;
-        };
-
-        overlay = workspace.mkPyprojectOverlay {
-          sourcePreference = "wheel";
-        };
-
-        baseSet = pkgs.callPackage inputs.pyproject-nix.build.packages {
-          inherit python;
-        };
-
-        pythonSet = baseSet.overrideScope (
-          pkgs.lib.composeManyExtensions [
-            inputs.pyproject-build-systems.overlays.default
-            overlay
-          ]
-        );
-
-        venv = pythonSet.mkVirtualEnv "${venvName}" workspace.deps.default;
+        pkgs = nixpkgs.legacyPackages.${system};
       in
       {
         devShells.default = pkgs.mkShell {
-          packages = [
-            pkgs.uv
-            venv
+          buildInputs = with pkgs; [
+            # Python environment
+            (python313.withPackages (ps: with ps; [
+              black
+              grpcio
+              grpcio-tools
+              protobuf
+            ]))
             
-            # Add build dependencies
-            pkgs.meson
-            pkgs.ninja
-            pkgs.pkg-config
-            python.pkgs.meson-python  # This provides mesonpy
+            # Development tools
+            gnumake
+            git
+            
+            # UV package manager
+            python313Packages.uv
+            
+            # Protobuf compilation tools
+            protobuf
+
+            stdenv.cc.cc.lib
+            
           ];
-          #env = {
-          #  LD_LIBRARY_PATH="/usr/lib64:$LD_LIBRARY_PATH";
-          #};
+          
+          shellHook = ''
+            export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [
+              pkgs.stdenv.cc.cc.lib
+              pkgs.zlib
+              pkgs.glib
+              pkgs.xorg.libX11
+            ]}:$LD_LIBRARY_PATH"
+            
+            # For debugging
+            echo "LD_LIBRARY_PATH is set to: $LD_LIBRARY_PATH"
+            
+            # Optional: Check if libstdc++.so.6 is accessible
+            find $LD_LIBRARY_PATH -name "libstdc++.so*" | sort
+
+            echo "OpenSnitch Agent Development Environment"
+            echo "----------------------------------------"
+            echo "Available tools:"
+            echo "  - Python with grpcio and protobuf packages"
+            echo "  - UV package manager: $(uv --version)"
+            echo "  - Protobuf compiler: $(protoc --version)"
+            echo ""
+            echo "Quick start:"
+            echo "  1. Clone OpenSnitch repo to get proto files:"
+            echo "     git clone https://github.com/evilsocket/opensnitch.git"
+            echo "  2. Generate Python client from proto files:"
+            echo "     python -m grpc_tools.protoc -I=./opensnitch/proto \\"
+            echo "       --python_out=. --grpc_python_out=. \\"
+            echo "       ./opensnitch/proto/ui.proto"
+            echo ""
+          '';
         };
       }
     );
