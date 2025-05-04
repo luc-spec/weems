@@ -86,11 +86,13 @@ applications:
   - /usr/bin/nordvpn
   - /usr/bin/expressvpn
   - /usr/bin/protonvpn
-  - /usr/bin/mullvad
-  - /usr/bin/clamav
-  - /usr/bin/rkhunter
-  - /tmp/suspicious_miner
-  - /tmp/backdoor_client
-  - /home/user/.hidden/keylogger
-  - /var/tmp/malicious_script
-  - /opt/not_malware/totally_legitimate
+  - /usr/bin/mullvad# Network simulation applications
+
+# bad applications
+  - /usr/bin/botnet
+  - /usr/bin/miner
+  - /usr/bin/covert-keylogger
+  - /usr/bin/logmykeys
+  - /usr/bin/dataminer
+  - /usr/bin/google-telemetry
+  - /usr/bin/sendbird

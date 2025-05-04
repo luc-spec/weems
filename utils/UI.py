@@ -85,3 +85,62 @@ class AgenTUI:
             elif response == "n":
                 return False
         return None
+
+
+class TrueFeedback:
+    """Mock user interface for agent training"""
+
+    def __init__(self):
+        self.pending_requests = {}
+        self.response_lock = Lock()
+        self.response_event = Event()
+        self.response = None
+        self.good_applications = get_destinations('data/good_applications.yaml')
+        self.good_destinations = get_destinations('data/good_destinations.yaml')
+
+    def ask_user(self, connection: OpenSnitchConnection) -> int:
+        """
+        Select action based on ground truth
+
+        Args:
+            connection: The connection to show
+
+        Returns:
+            int: Auto-selected action
+        """
+
+        # print("Actions:")
+        # print("0: Allow Once")
+        # print("1: Allow Until App Quits")
+        # print("2: Allow Always")
+        # print("3: Block Once")
+        # print("4: Block Until App Quits")
+        # print("5: Block Always")
+        # print("-" * 60)
+
+        return randint(0, 5)
+
+    def get_feedback(
+        self, connection: OpenSnitchConnection, action: int
+    ) -> Optional[bool]:
+        """
+        True feedback on an automatically taken action
+
+        Args:
+            connection: The connection
+            action: The action that was taken
+
+        Returns:
+            bool or None: True if user approves, False if disapproves, None if no feedback
+        """
+
+        if connection.destination in self.good_destinations \
+                and connection.application in self.good_applications \
+                and action in (0, 1, 2):
+            return True
+        elif connection.destination in self.bad_destinations \
+                and connection.application in self.bad_applications \
+                and action in (2, 3, 4):
+            return True
+        else:
+            return False

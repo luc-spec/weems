@@ -3,20 +3,21 @@
 # Default target
 all: setup generate-proto
 
+run:
+	@uv run weems.py --simulate 10 --no-training
+
 test:
 	@uv run pytest
 
 format: 
-	@black ./*.py
-	@black ./utils/*.py
-	@black ./tests/*.py
+	@bash -c './scripts/format_project.sh'
 
 # Get OpenSnitch proto file
 get-proto:
-	@echo "Cloning OpenSnitch repository to get proto files..."
 	@if [ -f "./proto/opensnitch.proto" ]; then \
 		echo "OpenSnitch protobuf file already exists"; \
 	else \
+		echo "Downloading OpenSnitch protobuf"; \
 		curl https://raw.githubusercontent.com/evilsocket/opensnitch/refs/heads/master/proto/ui.proto > proto/opensnitch.proto; \
 	fi
 

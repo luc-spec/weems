@@ -607,7 +607,9 @@ class OpenSnitchPolicy:
         if model_path is None:
             self.agent = DRQNAgent(state_dim=state_dim, device=device)
         else:
-            self.agent = DRQNAgent(state_dim=state_dim, model_path=model_path, device=device)
+            self.agent = DRQNAgent(
+                state_dim=state_dim, model_path=model_path, device=device
+            )
 
         # User interface for interaction
         self.ui = AgenTUI()
@@ -681,7 +683,7 @@ class OpenSnitchPolicy:
         self.connection_history[app_id].append(connection)
 
         # Get an action to execute
-        if self.training_mode and np.random.random() < 0.10:  
+        if self.training_mode and np.random.random() < 0.10:
             # Exploration: ask the user for some ground truth sometimes
             action = self.ui.ask_user(connection)
         else:
@@ -790,17 +792,28 @@ class OpenSnitchPolicy:
 def simulate_connections(policy: OpenSnitchPolicy, n_connections: int = 100):
     """Simulate connection requests to test the policy"""
     # Sample applications
-    applications = get_applications('data/good_applications.yaml')
+    applications = get_applications("data/applications.yaml")
 
     # Sample destinations (domains/IPs)
-    destinations = get_destinations('data/good_destinations.yaml')
+    destinations = get_destinations("data/good_destinations.yaml")
 
     # Generate random connections
     for i in range(n_connections):
         # Choose random application and destination
         app = np.random.choice(applications)
         dest = destinations[np.random.randint(0, len(destinations))]
-        domain, ip, port, protocol = dest
+
+        if np.random.randint(0,10) < 3:
+            # pick a url out of a pihole blocklist
+            try:
+                domain = np.random.choice(
+                        open('lists/ads.txt','r').readlines()
+                    ).split(' ')[1]
+                _, ip, port, protocol = dest
+            except FileNotFoundError:
+                domain, ip, port, protocol = dest
+        else:
+            domain, ip, port, protocol = dest
 
         # Create connection
         connection = OpenSnitchConnection(
