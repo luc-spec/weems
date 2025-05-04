@@ -6,8 +6,6 @@ using Deep Recurrent Q-Networks (DRQN) and POMDPs.
 """
 
 import os
-import sys
-import uuid
 import time
 import json
 import pickle
@@ -24,9 +22,11 @@ import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 
 # Local Imports
-from DecisionStructure import Actions, Experience
-from UI import AgenTUI
-from OpensnitchInterface import OpenSnitchConnection, RuleGenerator
+from .DataLoader import get_applications, get_destinations
+from .DecisionStructure import Actions, Experience
+from .UI import AgenTUI
+from .Sim import OpenSnitchPlayback
+from .OpensnitchInterface import OpenSnitchConnection, RuleGenerator
 
 # Configure logging
 logging.basicConfig(
@@ -416,15 +416,15 @@ class RewardFunction:
     """Calculate rewards for reinforcement learning based on actions and outcomes"""
 
     def __init__(self):
-        self.reputation_threshold_malicious = 0.3
-        self.reputation_threshold_legitimate = 0.7
+        self.reputation_threshold_malicious = 0.2
+        self.reputation_threshold_legitimate = 0.6
 
         # Reward values
         self.allowed_malicious_penalty = -10.0
-        self.blocked_legitimate_penalty = -1.0
-        self.allowed_legitimate_reward = 1.0
-        self.blocked_suspicious_reward = 0.5
-        self.user_interruption_penalty = -0.2
+        self.blocked_legitimate_penalty = -5.0
+        self.allowed_legitimate_reward = 3.0
+        self.blocked_suspicious_reward = 1.0
+        self.user_interruption_penalty = -1.0
 
     def calculate_reward(
         self,
@@ -584,7 +584,7 @@ class StateHistoryTracker:
 class OpenSnitchPolicy:
     """Intelligent policy for OpenSnitch using reinforcement learning"""
 
-    def __init__(self, opensnitch_interface=None):
+    def __init__(self, model_path: str = None, opensnitch_interface=None):
         # Feature extractor for state representation
         self.feature_extractor = FeatureExtractor()
 
@@ -603,7 +603,11 @@ class OpenSnitchPolicy:
 
         # Initialize RL agent
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.agent = DRQNAgent(state_dim=state_dim, device=device)
+
+        if model_path is None:
+            self.agent = DRQNAgent(state_dim=state_dim, device=device)
+        else:
+            self.agent = DRQNAgent(state_dim=state_dim, model_path=model_path, device=device)
 
         # User interface for interaction
         self.ui = AgenTUI()
@@ -676,10 +680,9 @@ class OpenSnitchPolicy:
             self.connection_history[app_id] = []
         self.connection_history[app_id].append(connection)
 
-        # Get action from agent (or ask user in exploration mode)
-        if (
-            self.training_mode and np.random.random() < 0.1
-        ):  # Exploration: ask user 10% of the time
+        # Get an action to execute
+        if self.training_mode and np.random.random() < 0.10:  
+            # Exploration: ask the user for some ground truth sometimes
             action = self.ui.ask_user(connection)
         else:
             # Get action from agent
@@ -780,39 +783,17 @@ class OpenSnitchPolicy:
             logger.info(f"Policy state loaded from {path}")
             return True
         except Exception as e:
-            logger.error(f"Error loading policy state: {e}")
+            logger.warning(f"Unable to load policy state from {path}: {e}")
             return False
 
 
 def simulate_connections(policy: OpenSnitchPolicy, n_connections: int = 100):
     """Simulate connection requests to test the policy"""
     # Sample applications
-    applications = [
-        "/usr/bin/firefox",
-        "/usr/bin/chromium",
-        "/usr/bin/wget",
-        "/usr/bin/curl",
-        "/usr/bin/apt",
-        "/usr/bin/ssh",
-        "/opt/zoom/zoom",
-        "/usr/lib/spotify",
-        "/usr/bin/python3",
-        "/usr/bin/git",
-    ]
+    applications = get_applications('data/good_applications.yaml')
 
     # Sample destinations (domains/IPs)
-    destinations = [
-        ("google.com", "142.250.74.110", 443, "tcp"),
-        ("facebook.com", "31.13.72.36", 443, "tcp"),
-        ("github.com", "140.82.121.3", 443, "tcp"),
-        ("amazon.com", "176.32.103.205", 443, "tcp"),
-        ("malware-example.com", "192.168.1.100", 443, "tcp"),
-        ("netflix.com", "54.236.124.56", 443, "tcp"),
-        ("localhost", "127.0.0.1", 8080, "tcp"),
-        ("ads.doubleclick.net", "142.250.74.162", 443, "tcp"),
-        ("bank-example.com", "192.168.1.50", 443, "tcp"),
-        ("", "8.8.8.8", 53, "udp"),  # DNS request
-    ]
+    destinations = get_destinations('data/good_destinations.yaml')
 
     # Generate random connections
     for i in range(n_connections):
@@ -848,20 +829,10 @@ def simulate_connections(policy: OpenSnitchPolicy, n_connections: int = 100):
             policy.save_state()
 
 
-class UserInterface:
-    """User interface for OpenSnitch policy"""
-
-    def __init__(self):
-        self.pending_requests = {}
-        self.response_lock = threading.Lock()
-        self.response_event = threading.Event()
-        self.response = None
-
-
 class DRQNAgent:
     """Deep Recurrent Q-Network Agent for OpenSnitch policy learning"""
 
-    def __init__(self, state_dim: int, device: str = "cpu"):
+    def __init__(self, state_dim: int, model_path: str = None, device: str = "cpu"):
         self.device = torch.device(device)
 
         # Action space
@@ -1095,7 +1066,7 @@ class DRQNAgent:
             logger.info(f"Model loaded from {path}")
             return True
         except Exception as e:
-            logger.error(f"Error loading model: {e}")
+            logger.warning(f"Unable to load model from {path}: {e}")
             return False
 
 

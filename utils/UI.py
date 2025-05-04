@@ -1,9 +1,9 @@
 from numpy.random import random
-from OpensnitchInterface import OpenSnitchConnection
 from threading import Event, Lock
 from typing import Optional
 
-from DecisionStructure import Actions
+from .DecisionStructure import Actions
+from .OpensnitchInterface import OpenSnitchConnection
 
 
 class AgenTUI:

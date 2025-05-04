@@ -1,12 +1,7 @@
-.PHONY: setup clone-proto generate-proto venv dev clean
+.PHONY: setup get-proto generate-proto venv dev clean
 
 # Default target
 all: setup generate-proto
-
-init:
-	@touch ./proto/__init__.py
-	@touch ./tests/__init__.py
-	@touch ./utils/__init__.py
 
 test:
 	@uv run pytest
@@ -16,42 +11,41 @@ format:
 	@black ./utils/*.py
 	@black ./tests/*.py
 
-# Clone OpenSnitch repository to get proto files
-clone-proto:
+# Get OpenSnitch proto file
+get-proto:
 	@echo "Cloning OpenSnitch repository to get proto files..."
-	@if [ -f "proto/opensnitch.proto" ]; then \
+	@if [ -f "./proto/opensnitch.proto" ]; then \
 		echo "OpenSnitch protobuf file already exists"; \
 	else \
-		curl https://github.com/evilsocket/tree/master/proto/ui.proto >> proto/opensnitch.proto; \
+		curl https://raw.githubusercontent.com/evilsocket/opensnitch/refs/heads/master/proto/ui.proto > proto/opensnitch.proto; \
 	fi
 
 # Generate Python code from proto files
-generate-proto: clone-proto
+generate-proto: get-proto
 	@echo "Generating Python code from proto files..."
-	@if [ ! -d "proto" ]; then \
-		mkdir -p ./proto; \
-	fi
-	python -m grpc_tools.protoc \
+	@if [ ! -d "proto" ]; then mkdir -p ./proto; fi
+	@python -m grpc_tools.protoc \
 		-I=./proto \
 		--python_out=./proto \
 		--grpc_python_out=./proto \
 		./proto/opensnitch.proto
 	@touch ./proto/__init__.py
-	@touch ./__init__.py
 	@echo "Proto files generated successfully"
 
 # Setup development environment using uv
 setup:
 	@echo "Setting up development environment..."
 	@uv venv
-	@uv pip install -e .
+	@if [ ! -d "./proto" ]; then mkdir -p ./proto; fi
+	@if [ ! -d "./.weems" ]; then mkdir -p ./.weems; fi
+	@touch ./__init__.py
+	@touch ./proto/__init__.py
+	@touch ./tests/__init__.py
+	@touch ./utils/__init__.py
 	@echo "Environment setup complete"
 
-# Install dev dependencies
-dev:
-	@echo "Installing development dependencies..."
-	@uv pip install -e ".[dev]"
-	@echo "Development dependencies installed"
+install:
+	@uv pip install -e .
 
 # Clean generated files
 clean:

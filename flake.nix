@@ -27,6 +27,7 @@
             # Development tools
             gnumake
             git
+            git-lfs
 
             # UV package manager
             python313Packages.uv

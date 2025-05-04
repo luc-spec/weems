@@ -3,7 +3,7 @@ from time import time
 from typing import Dict
 from uuid import uuid4
 
-from DecisionStructure import Actions
+from .DecisionStructure import Actions
 
 
 # OpenSnitch API - mock import for demonstration

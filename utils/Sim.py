@@ -1,194 +1,184 @@
-import random
-import string
-import random
-import glob
-import os
+#!/usr/bin/env python3
+import sqlite3
+import time
+import sys
+from time import time
+from datetime import datetime
+from logging import getLogger
+from numpy.random import choice, randint
 
-FIXED_LISTS_DIR = "./lists/*.txt"
+from utils.OpensnitchInterface import OpenSnitchConnection
 
-
-def generate_random_url():
-    if random.randint(1, 10) < 2:
-        return get_url_from_blocklist()
-    else:
-        return get_dummy_url()
+logger = getLogger("agent")
 
 
-def get_url_from_blocklist(file_pattern, sample_size=1):
-    """
-    Extract a random sample of URLs from multiple text files.
+class OpenSnitchPlayback:
+    def __init__(self, db_path, callback=None, time_scale=1.0, limit=None, verbose=False):
+        """
+        Initialize the OpenSnitch event simulator.
+        
+        Args:
+            db_path (str): Path to the OpenSnitch SQLite database
+            time_scale (float): Speed factor for playback (1.0 = real-time, 2.0 = double speed)
+            limit (int): Maximum number of events to replay (None for all)
+            verbose (bool): Whether to print detailed event information
+        """
+        self.db_path = db_path
+        self.time_scale = time_scale
+        self.limit = limit
+        self.verbose = verbose
+        self.connections = []
+        self.conn = None
+        self.cursor = None
 
-    Args:
-        file_pattern (str): Glob pattern to match text files (e.g., 'data/*.txt')
-        sample_size (int): Number of random URLs to return
-
-    Returns:
-        list: Random sample of URLs
-    """
-    all_urls = []
-
-    # Get list of all files matching the pattern
-    files = glob.glob(file_pattern)
-
-    # Read URLs from each file
-    for file_path in files:
-        with open(file_path, "r", encoding="utf-8") as file:
-            # Read lines and strip whitespace
-            file_urls = [line.strip() for line in file if line.strip()]
-            all_urls.extend(file_urls)
-
-    # Get random sample (or all if sample_size is larger than available URLs)
-    sample_size = min(sample_size, len(all_urls))
-    return random.sample(all_urls, sample_size)
-
-
-def generate_dummy_url():
-    """
-    Generate a plausible URL from a fixed batch of segments
-    """
-    # Create lists of common TLDs, domains, and paths
-    tlds = ["com", "org", "net", "edu", "io", "co", "app", "dev"]
-
-    # Generate domain name (company or service name)
-    domain_prefixes = ["app", "my", "the", "get", "try", "use", "", "go"]
-    domain_words = [
-        "tech",
-        "cloud",
-        "data",
-        "stream",
-        "code",
-        "byte",
-        "web",
-        "link",
-        "dev",
-        "site",
-        "connect",
-        "sync",
-        "flow",
-        "hub",
-        "spot",
-        "wave",
-        "pulse",
-        "stack",
-        "box",
-        "space",
-        "now",
-        "net",
-        "pro",
-    ]
-
-    # Common URL paths
-    path_segments = [
-        "api",
-        "app",
-        "blog",
-        "docs",
-        "help",
-        "login",
-        "register",
-        "user",
-        "dashboard",
-        "account",
-        "profile",
-        "settings",
-        "search",
-        "products",
-        "services",
-        "about",
-        "contact",
-        "support",
-        "news",
-        "events",
-    ]
-
-    # Common URL parameters
-    param_keys = [
-        "id",
-        "user",
-        "page",
-        "limit",
-        "sort",
-        "filter",
-        "token",
-        "ref",
-        "utm_source",
-        "utm_medium",
-        "utm_campaign",
-        "query",
-        "lang",
-        "view",
-    ]
-
-    # Choose protocol
-    protocol = random.choice(["http", "https"])
-
-    # Choose if we want a www prefix
-    www_prefix = random.choice(["www.", ""])
-
-    # Generate domain
-    domain_prefix = random.choice(domain_prefixes)
-    domain_word = random.choice(domain_words)
-    if domain_prefix:
-        domain = f"{domain_prefix}{domain_word}"
-    else:
-        domain = domain_word
-
-    # Choose TLD
-    tld = random.choice(tlds)
-
-    # Decide on path length (0-4 segments)
-    path_length = random.randint(0, 4)
-    path = ""
-    if path_length > 0:
-        path_parts = []
-        for _ in range(path_length):
-            if random.random() < 0.7:  # 70% chance to use common path
-                segment = random.choice(path_segments)
-            else:  # 30% chance for random string
-                segment_length = random.randint(3, 10)
-                segment = "".join(
-                    random.choices(string.ascii_lowercase, k=segment_length)
-                )
-            path_parts.append(segment)
-
-        path = "/" + "/".join(path_parts)
-
-        # Sometimes add a trailing slash
-        if random.random() < 0.3:
-            path += "/"
-
-    # Decide on parameters (0-3 params)
-    param_count = random.randint(0, 3)
-    params = ""
-    if param_count > 0:
-        param_pairs = []
-        for _ in range(param_count):
-            # 80% chance to use common param key, 20% chance for random
-            if random.random() < 0.8:
-                key = random.choice(param_keys)
+        if self.connect_to_db():
+            self.load_events()
+    
+    def connect_to_db(self):
+        """Connect to the OpenSnitch SQLite database."""
+        try:
+            self.conn = sqlite3.connect(self.db_path)
+            self.conn.row_factory = sqlite3.Row
+            self.cursor = self.conn.cursor()
+            return True
+        except sqlite3.Error as e:
+            print(f"Database connection error: {e}", file=sys.stderr)
+            return False
+    
+    def load_events(self):
+        """
+        Load connection events from the database.
+        
+        OpenSnitch typically stores connection events in a 'connections' table,
+        but the exact schema might vary between versions.
+        """
+        try:
+            # First, let's inspect the database schema to find the right table
+            self.cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+            tables = [table[0] for table in self.cursor.fetchall()]
+            
+            if 'connections' in tables:
+                table_name = 'connections'
+            elif 'connection' in tables:
+                table_name = 'connection'
             else:
-                key_length = random.randint(2, 8)
-                key = "".join(random.choices(string.ascii_lowercase, k=key_length))
+                # Try to find a table that might contain connection data
+                for table in tables:
+                    if 'connect' in table.lower():
+                        table_name = table
+                        break
+                else:
+                    raise ValueError("Could not find a connections table in the database")
+            
+            # Get column information for the table
+            self.cursor.execute(f"PRAGMA table_info({table_name})")
+            columns = [column[1] for column in self.cursor.fetchall()]
+            
+            # Build a query based on available columns
+            query = f"SELECT * FROM {table_name}"
+            if self.limit:
+                query += f" LIMIT {self.limit}"
+            
+            # Execute query and process results
+            self.cursor.execute(query)
+            rows = self.cursor.fetchall()
+            
+            # Map database columns to OpenSnitchConnection attributes
+            for row in rows:
+                conn = OpenSnitchConnection()
+                
+                # Map common column names (adjust based on actual schema)
+                for column in columns:
+                    col_lower = column.lower()
+                    value = row[column]
+                    
+                    if 'process' in col_lower and 'path' in col_lower:
+                        conn.process_path = value
+                    elif col_lower == 'pid' or col_lower == 'process_id':
+                        conn.pid = value if value else 0
+                    elif col_lower == 'dst_ip' or col_lower == 'dst_addr' or col_lower == 'remote_addr':
+                        conn.dst_ip = value
+                    elif col_lower == 'dst_host' or col_lower == 'host':
+                        conn.dst_host = value
+                    elif col_lower == 'dst_port' or col_lower == 'port':
+                        conn.dst_port = value if value else 0
+                    elif col_lower == 'protocol' or col_lower == 'proto':
+                        conn.protocol = value
+                    elif col_lower == 'user_id' or col_lower == 'uid':
+                        conn.user_id = value if value else 0
+                    elif 'time' in col_lower and ('stamp' in col_lower or 'stamp' in col_lower):
+                        # Try to parse timestamp
+                        try:
+                            if isinstance(value, (int, float)):
+                                conn.timestamp = float(value)
+                            elif isinstance(value, str):
+                                # Try to parse datetime string to timestamp
+                                dt = datetime.fromisoformat(value.replace('Z', '+00:00'))
+                                conn.timestamp = dt.timestamp()
+                        except (ValueError, TypeError):
+                            # If timestamp parsing fails, just use the index as a sequence
+                            pass
+                
+                self.connections.append(conn)
+            
+            # If we couldn't parse timestamps, use sequence numbers
+            if any(conn.timestamp == 0 for conn in self.connections):
+                first_time = time()
+                for i, conn in enumerate(self.connections):
+                    # Assign timestamps spaced 1 second apart
+                    conn.timestamp = first_time + i
+            
+            # Sort connections by timestamp
+            self.connections.sort(key=lambda x: x.timestamp)
+            
+            print(f"Loaded {len(self.connections)} connection events")
+            return True
+            
+        except sqlite3.Error as e:
+            print(f"Error loading events: {e}", file=sys.stderr)
+            return False
+        except Exception as e:
+            print(f"Unexpected error: {e}", file=sys.stderr)
+            return False
+    
+    def simulate(self):
+        """
+        Simulate connection events with proper timing.
+        
+        Args:
+            event_callback (callable): Optional callback function that takes an OpenSnitchConnection
+                                      object as an argument, called for each event.
+        """
+        if not self.connections:
+            print("No connections to simulate", file=sys.stderr)
+            return
+        
+        print(f"Starting simulation with time scale factor: {self.time_scale}")
+        
+        start_time = time()
+        first_event_time = self.connections[0].timestamp
+        
+        for i, conn in enumerate(self.connections):
+            # Calculate when this event should happen in simulation time
+            event_delay = (conn.timestamp - first_event_time) / self.time_scale
+            
+            # Calculate how long to wait from now
+            #elapsed = time() - start_time
+            #wait_time = max(0, event_delay - elapsed)
+            
+            #if wait_time > 0:
+            #    time.sleep(wait_time)
+            
+            # Process the event
+            if self.verbose:
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] Event {i+1}/{len(self.connections)}: "
+                      f"{conn.process_path} (PID: {conn.pid}) → {conn.dst_host or conn.dst_ip}:{conn.dst_port} "
+                      f"[{conn.protocol}] (User: {conn.user_id})")
+            
+            # Call the callback if provided
+            if self.callback and callable(self.callback):
+                self.callback(conn)
+        
+        print(f"Simulation completed. Replayed {len(self.connections)} events in "
+              f"{time() - start_time:.2f} seconds.")
 
-            # Value could be a number, id, or string
-            val_type = random.random()
-            if val_type < 0.4:  # 40% chance for number
-                value = str(random.randint(1, 1000))
-            elif val_type < 0.7:  # 30% chance for id-like string
-                value = "".join(
-                    random.choices(
-                        string.ascii_lowercase + string.digits, k=random.randint(6, 12)
-                    )
-                )
-            else:  # 30% chance for word-like string
-                value = "".join(
-                    random.choices(string.ascii_lowercase, k=random.randint(3, 10))
-                )
-
-            param_pairs.append(f"{key}={value}")
-
-        params = "?" + "&".join(param_pairs)
-
-    # Put it all together
-    url = f"{protocol}://{www_prefix}{domain}.{tld}{path}{params}"
-    return url

@@ -1,0 +1,109 @@
+# Network simulation destinations
+destinations:
+  # Major websites & services
+  - [google.com, 142.250.74.110, 443, tcp]
+  - [facebook.com, 31.13.72.36, 443, tcp]
+  - [github.com, 140.82.121.3, 443, tcp]
+  - [amazon.com, 176.32.103.205, 443, tcp]
+  - [netflix.com, 54.236.124.56, 443, tcp]
+  - [youtube.com, 172.217.13.78, 443, tcp]
+  - [twitter.com, 104.244.42.65, 443, tcp]
+  - [instagram.com, 31.13.70.174, 443, tcp]
+  - [linkedin.com, 13.107.42.14, 443, tcp]
+  - [microsoft.com, 40.76.4.15, 443, tcp]
+  - [apple.com, 17.253.144.10, 443, tcp]
+  - [dropbox.com, 162.125.6.1, 443, tcp]
+  - [spotify.com, 35.186.224.25, 443, tcp]
+  - [reddit.com, 151.101.65.140, 443, tcp]
+  - [twitch.tv, 151.101.66.167, 443, tcp]
+  - [tiktok.com, 92.223.96.136, 443, tcp]
+  - [zoom.us, 3.235.69.64, 443, tcp]
+  - [slack.com, 54.192.151.79, 443, tcp]
+  - [office365.com, 13.107.6.171, 443, tcp]
+  - [wikipedia.org, 91.198.174.192, 443, tcp]
+  
+  # Cloud services
+  - [s3.amazonaws.com, 52.216.177.67, 443, tcp]
+  - [drive.google.com, 142.250.80.174, 443, tcp]
+  - [onedrive.live.com, 13.107.42.13, 443, tcp]
+  - [azure.microsoft.com, 13.107.6.175, 443, tcp]
+  - [storage.googleapis.com, 172.217.17.48, 443, tcp]
+  - [cloudfront.net, 13.35.203.38, 443, tcp]
+  - [cdn.jsdelivr.net, 151.101.1.229, 443, tcp]
+  
+  # Software repositories
+  - [archive.ubuntu.com, 91.189.91.38, 80, tcp]
+  - [downloads.fedoraproject.org, 38.145.60.21, 443, tcp]
+  - [repo.manjaro.org, 95.217.163.246, 443, tcp]
+  - [mirror.centos.org, 52.3.71.62, 443, tcp]
+  - [registry.npmjs.org, 104.16.24.35, 443, tcp]
+  - [pypi.org, 151.101.0.223, 443, tcp]
+  - [rubygems.org, 151.101.194.217, 443, tcp]
+  - [crates.io, 13.32.103.34, 443, tcp]
+  
+  # Banking and financial services
+  - [bank-example.com, 192.168.1.50, 443, tcp]
+  - [chase.com, 159.53.224.21, 443, tcp]
+  - [bankofamerica.com, 171.159.228.150, 443, tcp]
+  - [wellsfargo.com, 159.45.93.45, 443, tcp]
+  - [paypal.com, 64.4.250.32, 443, tcp]
+  - [visa.com, 12.149.197.11, 443, tcp]
+  - [mastercard.com, 152.195.19.42, 443, tcp]
+  - [coinbase.com, 104.18.9.101, 443, tcp]
+  
+  # DNS servers
+  - ["", 8.8.8.8, 53, udp]  # Google DNS
+  - ["", 8.8.4.4, 53, udp]  # Google DNS secondary
+  - ["", 1.1.1.1, 53, udp]  # Cloudflare DNS
+  - ["", 9.9.9.9, 53, udp]  # Quad9 DNS
+  - ["", 208.67.222.222, 53, udp]  # OpenDNS
+  - ["", 208.67.220.220, 53, udp]  # OpenDNS secondary
+  
+  # Local services
+  - [localhost, 127.0.0.1, 8080, tcp]
+  - [localhost, 127.0.0.1, 3306, tcp]  # MySQL
+  - [localhost, 127.0.0.1, 5432, tcp]  # PostgreSQL
+  - [localhost, 127.0.0.1, 27017, tcp]  # MongoDB
+  - [localhost, 127.0.0.1, 6379, tcp]  # Redis
+  - [localhost, 127.0.0.1, 9200, tcp]  # Elasticsearch
+  - [localhost, 127.0.0.1, 5000, tcp]  # Flask typical port
+  - [localhost, 127.0.0.1, 3000, tcp]  # Node.js typical port
+  - [localhost, 127.0.0.1, 8000, tcp]  # Django typical port
+  - [localhost, 127.0.0.1, 4200, tcp]  # Angular typical port
+  - [localhost, "::1", 8080, tcp]  # IPv6 localhost
+  
+  # Email services
+  - [smtp.gmail.com, 173.194.76.108, 465, tcp]
+  - [imap.gmail.com, 173.194.73.108, 993, tcp]
+  - [smtp.office365.com, 40.101.91.11, 587, tcp]
+  - [outlook.office365.com, 52.96.6.34, 993, tcp]
+  - [smtp.mail.yahoo.com, 98.136.86.109, 465, tcp]
+  
+  # Gaming services
+  - [steam.com, 104.98.189.15, 443, tcp]
+  - [steamcommunity.com, 104.98.189.13, 443, tcp]
+  - [ea.com, 159.153.64.104, 443, tcp]
+  - [blizzard.com, 137.221.106.198, 443, tcp]
+  - [epicgames.com, 104.16.140.131, 443, tcp]
+  - [playstation.com, 23.40.179.185, 443, tcp]
+  - [xboxlive.com, 52.143.88.28, 443, tcp]
+  
+  # Various non-standard ports
+  - [ssh-server.example, 198.51.100.5, 22, tcp]
+  - [ftp-server.example, 203.0.113.10, 21, tcp]
+  - [telnet-server.example, 198.51.100.15, 23, tcp]
+  - [rdp-server.example, 203.0.113.20, 3389, tcp]
+  - [vnc-server.example, 198.51.100.25, 5900, tcp]
+  - [sql-server.example, 203.0.113.30, 1433, tcp]
+  - [irc-server.example, 198.51.100.35, 6667, tcp]
+  - [ntp-server.example, 203.0.113.40, 123, udp]
+  - [sip-server.example, 198.51.100.45, 5060, udp]
+  - [tftp-server.example, 203.0.113.50, 69, udp]
+  - [quic-server.example, 198.51.100.55, 443, udp]
+  
+  # IoT and Smart Home
+  - [smart-thermostat.local, 192.168.1.120, 443, tcp]
+  - [security-camera.local, 192.168.1.121, 443, tcp]
+  - [smart-speaker.local, 192.168.1.122, 443, tcp]
+  - [smart-tv.local, 192.168.1.123, 443, tcp]
+  - [smart-bulb.local, 192.168.1.124, 443, tcp]

@@ -1,0 +1,2 @@
+data filter=lfs diff=lfs merge=lfs -text
+data/opensnitch.sqlite filter=lfs diff=lfs merge=lfs -text
