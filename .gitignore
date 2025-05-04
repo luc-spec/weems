@@ -5,3 +5,4 @@
 proto/
 
 **__pycache__**
+opensnitch_rl_main.log

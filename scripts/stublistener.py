@@ -5,7 +5,7 @@ OpenSnitch Notification Stream Client
 This script connects to an existing OpenSnitch socket and establishes a bidirectional
 stream, displaying all incoming messages from the OpenSnitch server.
 """
-
+import pathconf
 import grpc
 import time
 from proto import opensnitch_pb2, opensnitch_pb2_grpc
