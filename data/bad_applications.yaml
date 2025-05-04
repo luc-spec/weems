@@ -1,0 +1,9 @@
+# Network simulation applications
+applications:
+  - /usr/bin/botnet
+  - /usr/bin/miner
+  - /usr/bin/covert-keylogger
+  - /usr/bin/logmykeys
+  - /usr/bin/dataminer
+  - /usr/bin/google-telemetry
+  - /usr/bin/sendbird

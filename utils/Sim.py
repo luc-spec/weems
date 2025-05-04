@@ -182,3 +182,7 @@ class OpenSnitchPlayback:
         print(f"Simulation completed. Replayed {len(self.connections)} events in "
               f"{time() - start_time:.2f} seconds.")
 
+class TrainingBot:
+    '''An automatic selector based on known ground truth with some randomness'''
+    def __init__(self):
+        pass

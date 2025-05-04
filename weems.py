@@ -25,6 +25,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("opensnitch_rl_main")
 
+
 def main():
     """
     Main entry point for Weems - the adaptive network traffic filter
@@ -37,14 +38,15 @@ def main():
 
     parser = argparse.ArgumentParser(description="Weems")
 
-    parser.add_argument(
-        "--model", type=str, help="Path to pre-trained model file"
-    )
+    parser.add_argument("--model", type=str, help="Path to pre-trained model file")
     parser.add_argument(
         "--simulate", type=int, default=0, help="Run simulation with N connections"
     )
     parser.add_argument(
         "--no-training", action="store_true", help="Disable training mode"
+    )
+    parser.add_argument(
+        "--random-training", action="store_true", help="Train with random input"
     )
     parser.add_argument(
         "--no-auto-rules",
@@ -77,12 +79,12 @@ def main():
             # Run simulation
             print(f"Running simulation with {args.simulate} connections...")
             simulate_connections(policy, args.simulate)
-            #osp = OpenSnitchPlayback(
-            #    db_path='data/opensnitch.sqlite.dne', 
+            # osp = OpenSnitchPlayback(
+            #    db_path='data/opensnitch.sqlite.dne',
             #    limit=args.simulate,
             #    callback=policy.handle_connection
-            #)
-            #osp.simulate()
+            # )
+            # osp.simulate()
         else:
             print("TODO: real implementation. Sleeping forever. Press Ctrl+C to exit.")
             while True:
@@ -97,6 +99,7 @@ def main():
         policy.stop_training_thread()
 
     print("Done.")
+
 
 if __name__ == "__main__":
     main()
