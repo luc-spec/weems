@@ -124,68 +124,6 @@ class NetworkLogAnalyzer:
         except Exception as e:
             print(f"Error loading logs: {e}")
 
-    def generate_basic_stats(self):
-        """Generate basic statistics about the connections."""
-        if not self.loaded:
-            print("Please load logs first.")
-            return
-
-        print("\n=== Basic Statistics ===")
-
-        # Connection counts
-        total_connections = len(self.connections)
-        print(f"Total connections: {total_connections}")
-
-        # Count by action type
-        action_counts = self.df["actionType"].value_counts()
-        print("\nAction counts:")
-        for action, count in action_counts.items():
-            print(f"  {action}: {count} ({count/total_connections*100:.1f}%)")
-
-        # Top destinations
-        top_destinations = self.df["destination_host"].value_counts().head(10)
-        print("\nTop 10 destination hosts:")
-        for host, count in top_destinations.items():
-            print(f"  {host}: {count} ({count/total_connections*100:.1f}%)")
-
-        # Top processes
-        top_processes = self.df["process"].value_counts().head(10)
-        print("\nTop 10 processes:")
-        for process, count in top_processes.items():
-            print(f"  {process}: {count} ({count/total_connections*100:.1f}%)")
-
-        # Top ports
-        top_ports = self.df["destination_port"].value_counts().head(10)
-        print("\nTop 10 destination ports:")
-        for port, count in top_ports.items():
-            print(f"  {port}: {count} ({count/total_connections*100:.1f}%)")
-
-    def plot_connections_over_time(self, output_path=None):
-        """Plot the number of connections over time."""
-        if not self.loaded:
-            print("Please load logs first.")
-            return
-
-        plt.figure(figsize=(12, 6))
-
-        # Resample by minute and count connections
-        connections_by_time = self.df.set_index("timestamp").resample("1min").size()
-
-        plt.plot(connections_by_time.index, connections_by_time.values)
-        plt.title("Connections Over Time")
-        plt.xlabel("Time")
-        plt.ylabel("Number of Connections")
-        plt.grid(True)
-        plt.tight_layout()
-
-        if output_path:
-            plt.savefig(output_path)
-            print(f"Saved connection time plot to {output_path}")
-        else:
-            plt.show()
-
-        plt.close()
-
     def plot_action_distribution(self, output_path=None):
         """Plot the distribution of actions (allow/block)."""
         if not self.loaded:
@@ -391,12 +329,12 @@ class NetworkLogAnalyzer:
         output_dir.mkdir(parents=True, exist_ok=True)
 
         # Generate basic stats
-        self.generate_basic_stats()
+        #self.generate_basic_stats()
 
         # Generate visualizations
-        self.plot_connections_over_time(
-            output_path=output_dir / "connections_over_time.png"
-        )
+        #self.plot_connections_over_time(
+        #    output_path=output_dir / "connections_over_time.png"
+        #)
         self.plot_action_distribution(
             output_path=output_dir / "action_distribution.png"
         )
