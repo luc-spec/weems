@@ -417,14 +417,17 @@ class RewardFunction:
 
     def __init__(self):
         self.reputation_threshold_malicious = 0.1
-        self.reputation_threshold_legitimate = 0.8
+        self.reputation_threshold_legitimate = 0.6
 
         # Reward values
-        self.allowed_legitimate_reward  =  4.0
+        self.allowed_legitimate_reward  =  6.0
         self.allowed_malicious_penalty  = -3.0
-        self.blocked_legitimate_penalty = -2.0
-        self.blocked_suspicious_reward  =  1.0
-        self.user_interruption_penalty  = -1.0
+        self.blocked_legitimate_penalty = -5.0
+        self.blocked_suspicious_reward  =  0.1
+        self.user_interruption_penalty  = -3.0
+
+        self.user_approves = 3.0
+        self.user_disapproves = -5.0
 
     def calculate_reward(
         self,
@@ -446,19 +449,12 @@ class RewardFunction:
             float: The calculated reward
         """
         # Extract reputation scores from state
-        # (Assuming specific indices in the feature vector - in a real implementation,
-        # this would be more robust)
-        domain_reputation_idx = 15  # Example index
+        domain_reputation_idx = 15
         domain_reputation = state[domain_reputation_idx]
 
         # If we have explicit user feedback, use it as primary signal
         if user_feedback is not None:
-            if action in [Actions.ALLOW_ONCE, Actions.ALLOW_TEMP, Actions.ALLOW_PERM]:
-                # User approved our allow decision
-                return 2.0 if user_feedback else -5.0
-            else:
-                # User approved our block decision
-                return 2.0 if not user_feedback else -5.0
+            return self.user_approves if user_feedback else self.user_disapproves
 
         # Otherwise calculate based on action and reputation
         if action in [Actions.ALLOW_ONCE, Actions.ALLOW_TEMP, Actions.ALLOW_PERM]:
@@ -484,7 +480,7 @@ class RewardFunction:
 class ThompsonSampling:
     """Thompson Sampling exploration strategy with Bayesian uncertainty"""
 
-    def __init__(self, alpha: float = 1.0, beta: float = 1.0):
+    def __init__(self, alpha: float = 1.04, beta: float = 0.99):
         # Priors
         self.alpha = alpha  
         self.beta = beta
@@ -701,6 +697,9 @@ class OpenSnitchPolicy:
                 feedback = self.ui.get_feedback(connection, action)
                 # Use feedback to calculate reward
                 if feedback is not None:
+                    # Modify reputation with user feedback if needed
+                    self.update_reputation(connection, action, user_feedback=feedback)
+
                     reward = self.reward_function.calculate_reward(
                         current_state, action, user_feedback=feedback
                     )
@@ -790,6 +789,61 @@ class OpenSnitchPolicy:
             logger.warning(f"Unable to load policy state from {path}: {e}")
             return False
 
+    def update_reputation(self, connection, action, reward=None, user_feedback=None):
+        """Update reputation scores based on connection outcomes and feedback"""
+        host = connection.dst_host
+        ip = connection.dst_ip
+        
+        # Initialize if not exists
+        if host not in self.feature_extractor.reputation_data["domains"]:
+            self.feature_extractor.reputation_data["domains"][host] = 0.5 # Start neutral
+        
+        if ip not in self.feature_extractor.reputation_data["ips"]:
+            self.feature_extractor.reputation_data["ips"][ip] = 0.5  # Start neutral
+        
+        # Amount to adjust (small increments)
+        adjustment = 0.02
+        
+        # If we have explicit user feedback, use it as strongest signal
+        if user_feedback is not None:
+            # User approved this destination
+            if user_feedback is True:
+                self.feature_extractor.reputation_data["domains"][host] = min(
+                    1.0, self.feature_extractor.reputation_data["domains"][host] + adjustment*2
+                )
+                self.feature_extractor.reputation_data["ips"][ip] = min(
+                    1.0, self.feature_extractor.reputation_data["ips"][ip] + adjustment*2
+                )
+            # User rejected this destination
+            else:
+                self.feature_extractor.reputation_data["domains"][host] = max(
+                    0.0, self.feature_extractor.reputation_data["domains"][host] - adjustment*3
+                )
+                self.feature_extractor.reputation_data["ips"][ip] = max(
+                    0.0, self.feature_extractor.reputation_data["ips"][ip] - adjustment*3
+                )
+        # If we allowed and no negative consequence observed, slightly increase reputation
+        elif action in [Actions.ALLOW_ONCE, Actions.ALLOW_TEMP, Actions.ALLOW_PERM]:
+            # Small positive adjustment for successful connections
+            self.feature_extractor.reputation_data["domains"][host] = min(
+                1.0, self.feature_extractor.reputation_data["domains"][host] + adjustment
+            )
+            self.feature_extractor.reputation_data["ips"][ip] = min(
+                1.0, self.feature_extractor.reputation_data["ips"][ip] + adjustment
+            )
+        
+        # Periodically save updated reputation data
+        if np.random.random() < 0.01:  # 1% chance each time
+            self._save_reputation_data()
+
+    def _save_reputation_data(self):
+        """Save updated reputation data to file"""
+        try:
+            with open("reputation_data.json", "w") as f:
+                json.dump(self.feature_extractor.reputation_data, f)
+            logger.info("Reputation data saved")
+        except Exception as e:
+            logger.warning(f"Failed to save reputation data: {e}")
 
 def simulate_connections(policy: OpenSnitchPolicy, n_connections: int = 100):
     """Simulate connection requests to test the policy"""
@@ -1050,6 +1104,7 @@ class DRQNAgent:
         self.train_step += 1
 
         return loss.item()
+
 
     def add_experience(self, state, action, reward, next_state, done):
         """Add experience to replay buffer"""
