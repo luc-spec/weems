@@ -1,10 +1,36 @@
+#[[tool.uv.index]]
+#name = "pytorch"
+#url = "https://download.pytorch.org/whl/cpu"
+#
+#[tool.uv.sources]
+#torch = { index = "pytorch" }
+
 [project]
 name = "weems"
 version = "0.1.0"
-description = "Add your description here"
+description = "Weems is a smart, adaptive, network filter that maximizes network traffic utility"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 dependencies = [
+    "grpcio>=1.71.0",
+    #"dbus-python>=1.4.0",
+    "matplotlib>=3.10.1",
+    "meson-python>=0.17.1",
     "nltk>=3.9.1",
-    "torch>=2.6.0",
+    "numpy>=2.1.2",
+    "pandas>=2.2.3",
+    "protobuf>=6.30.2",
+    "psutil>=7.0.0",
+    #"systemd>=0.17.1",
+    "pytest>=8.3.5",
+    "pyyaml>=6.0.2",
+    "seaborn>=0.13.2",
+    "tensorboard>=2.19.0",
+    "torch>=2.7.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.5",
+    "setuptools>=70.2.0",
 ]

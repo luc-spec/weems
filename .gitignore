@@ -1,1 +1,10 @@
+.envrc
+
 .venv/
+.weems/
+proto/
+
+analysis/
+
+**__pycache__**
+opensnitch_rl_main.log
