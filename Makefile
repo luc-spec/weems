@@ -4,7 +4,15 @@
 all: setup generate-proto
 
 run:
-	@uv run weems.py --simulate 10 --no-training
+	@uv run weems.py --simulate 10000 --no-training
+
+train:
+	@uv run weems.py --simulate 1000
+
+analyze:
+	@uv run utils/LogAnalysis.py ./.weems/agent.log
+
+evaluate: train run analyze
 
 test:
 	@uv run pytest

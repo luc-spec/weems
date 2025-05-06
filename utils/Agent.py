@@ -416,15 +416,15 @@ class RewardFunction:
     """Calculate rewards for reinforcement learning based on actions and outcomes"""
 
     def __init__(self):
-        self.reputation_threshold_malicious = 0.2
-        self.reputation_threshold_legitimate = 0.6
+        self.reputation_threshold_malicious = 0.1
+        self.reputation_threshold_legitimate = 0.8
 
         # Reward values
-        self.allowed_malicious_penalty = -10.0
-        self.blocked_legitimate_penalty = -5.0
-        self.allowed_legitimate_reward = 3.0
-        self.blocked_suspicious_reward = 1.0
-        self.user_interruption_penalty = -1.0
+        self.allowed_legitimate_reward  =  4.0
+        self.allowed_malicious_penalty  = -3.0
+        self.blocked_legitimate_penalty = -2.0
+        self.blocked_suspicious_reward  =  1.0
+        self.user_interruption_penalty  = -1.0
 
     def calculate_reward(
         self,
@@ -485,9 +485,11 @@ class ThompsonSampling:
     """Thompson Sampling exploration strategy with Bayesian uncertainty"""
 
     def __init__(self, alpha: float = 1.0, beta: float = 1.0):
-        self.alpha = alpha  # Prior parameter
-        self.beta = beta  # Prior parameter
-        self.action_counts = {}  # Dict to store counts for each state-action pair
+        # Priors
+        self.alpha = alpha  
+        self.beta = beta
+
+        self.action_counts = {} 
 
     def select_action(
         self, q_values: torch.Tensor, state_hash: str, exploit_threshold: float = 0.95
@@ -656,7 +658,7 @@ class OpenSnitchPolicy:
         while not self.stop_training.is_set():
             if self.agent.memory.is_ready_for_training():
                 self.agent.update_model()
-            time.sleep(5)  # Train every 5 seconds
+            #time.sleep(5)  # Train every 5 seconds
 
     def handle_connection(self, connection: OpenSnitchConnection) -> int:
         """
@@ -683,7 +685,7 @@ class OpenSnitchPolicy:
         self.connection_history[app_id].append(connection)
 
         # Get an action to execute
-        if self.training_mode and np.random.random() < 0.10:
+        if self.training_mode and np.random.random() < 0.01:
             # Exploration: ask the user for some ground truth sometimes
             action = self.ui.ask_user(connection)
         else:
@@ -723,7 +725,7 @@ class OpenSnitchPolicy:
         self.agent.exploration.update(state_hash, action, reward)
 
         # If we're allowing a connection to a potentially malicious site, log it
-        domain_reputation_idx = 15  # Example index from feature extractor
+        domain_reputation_idx = 15
         if (
             action in [Actions.ALLOW_ONCE, Actions.ALLOW_TEMP, Actions.ALLOW_PERM]
             and current_state[domain_reputation_idx]
@@ -803,7 +805,7 @@ def simulate_connections(policy: OpenSnitchPolicy, n_connections: int = 100):
         app = np.random.choice(applications)
         dest = destinations[np.random.randint(0, len(destinations))]
 
-        if np.random.randint(0,10) < 3:
+        if np.random.randint(0,10) < 2:
             # pick a url out of a pihole blocklist
             try:
                 domain = np.random.choice(
@@ -835,7 +837,7 @@ def simulate_connections(policy: OpenSnitchPolicy, n_connections: int = 100):
         )
 
         # Sleep to simulate time passing
-        time.sleep(0.1)
+        #time.sleep(0.1)
 
         # Periodically save state
         if (i + 1) % 10 == 0:
@@ -871,8 +873,8 @@ class DRQNAgent:
 
         # Training params
         self.batch_size = 32
-        self.gamma = 0.99  # Discount factor
-        self.tau = 0.01  # Target network update rate
+        self.gamma = 0.98  # Discount factor
+        self.tau = 0.05  # Target network update rate
         self.sequence_length = 8  # Length of state sequences for LSTM
 
         # Logging
